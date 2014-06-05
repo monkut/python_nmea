@@ -16,6 +16,7 @@ class InvalidChecksum(Exception):
 class NMEABaseSentence(object):
     
     def ll2decimaldegrees(self, value, direction):
+        """parse lon/lat values into decimal degrees"""
         value_in=float(value)
     
         if direction == 'S':
@@ -30,6 +31,7 @@ class NMEABaseSentence(object):
     
     
     def date_and_time2datetime(self, date_value=None, time_value=None):
+        """Parse text date and/or time into datetime object"""
         if date_value and time_value:
             # remove fractional portion if it exists
             time_value = time_value.split(".")[0]            
@@ -201,6 +203,11 @@ class GPGSVSentence(NMEABaseSentence):
          
 
 class NMEAParser(object):
+    """
+    NMEA format parser.  
+    Returns Sentence objects with parsed datetime, and lon/lat in decimal degrees where appropriate.
+    """
+    
     def __init__(self, desired_sentences=None):
         if desired_sentences is None:
             desired_sentences = ("$GPGGA", "$GPRMC", "$GPGSV")
@@ -211,7 +218,6 @@ class NMEAParser(object):
                                  "$GPRMC": GPRMCSentence,        
                                  "$GPGSV": GPGSVSentence,                
                                  }
-         
         self.supported_sentences = self.sentence_objects.keys()
         
         for desired_sentence in desired_sentences:
@@ -219,8 +225,9 @@ class NMEAParser(object):
                 raise SentenceNotSupported("{} not in {}".format(desired_sentence, self.supported_sentences))
         self.sentences_to_parse = desired_sentences
 
+
     def parse_sentence(self, nmea_sentence):
-        """returns a single parsed sentence"""
+        """returns a single parsed sentence as a sentence object"""
         sentence_obj = None
         for sentence_format in self.sentences_to_parse:            
             if nmea_sentence.startswith(sentence_format):
@@ -229,20 +236,17 @@ class NMEAParser(object):
         return sentence_obj
                                                 
 
-    def parse(self, filepath):
+    def parse_nmea_file(self, filepath):
         """yields parsed sentence objects"""
         filepath = os.path.abspath(filepath)
-        if os.path.exists(filepath):
-            f = open(filepath, "r")
-        else:
-            raise Exception("Given NMEA GPS file path not found: %s" % (filepath))
-                    
-        for nmea_sentence in f.readlines():
-            sentence_obj = None
-            try:
-                sentence_obj = self.parse_sentence(nmea_sentence)
-            except InvalidSentenceLength:
-                continue                    
-
-            if sentence_obj:
-                yield sentence_obj
+        
+        with open(filepath, "r") as f:
+            for nmea_sentence in f:
+                sentence_obj = None
+                try:
+                    sentence_obj = self.parse_sentence(nmea_sentence)
+                except InvalidSentenceLength:
+                    continue                    
+    
+                if sentence_obj:
+                    yield sentence_obj
